@@ -5,6 +5,9 @@ from pyspark.sql import Window
 This is the OMOP-meds ETL from meds_etl 0.1.3
 """
 
+OMOP_BIRTH = 4083587
+OMOP_DEATH = 4306655
+
 def extract_events(df, table):
     """
     Convert an OMOP table into an unordered MEDS-DataSchema-LIKE table in flat format, containing all events
