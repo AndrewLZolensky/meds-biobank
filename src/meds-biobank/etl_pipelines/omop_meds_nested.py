@@ -384,7 +384,7 @@ def post_process_events(events, concepts):
     events = (
         events
         .withColumn("numeric_value", F.expr("try_cast(value AS FLOAT)"))
-        .withColumn("string_value", F.when(F.expr("try_cast(value AS FLOAT)").isNull(), F.col("value")).otherwise(F.lit(None)))
+        .withColumn("text_value", F.when(F.expr("try_cast(value AS FLOAT)").isNull(), F.col("value")).otherwise(F.lit(None)))
         .drop("value")
     )
 
