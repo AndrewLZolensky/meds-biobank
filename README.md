@@ -1,61 +1,79 @@
 # meds-biobank
-This is an UNOFFICIAL lightweight python re-implementation of several parts of the MEDS software ecosystem. It is designed to operate on in-memory tables loaded via pyspark, rather than directly on disk. It is intended for users of small to medium-scale biobanks, which are often queried via cloud services from Interactive Python Notebooks.
 
-At this time the package is primarily developed for use with Penn Medicine Biobank.
+> Unofficial, lightweight Python re-implementation of parts of the **MEDS** software ecosystem, built to operate on in-memory tables loaded via PySpark rather than directly on disk. Designed for small-to-medium biobanks queried through cloud services in interactive Python notebooks.
 
-# Features
+**Primary target:** Penn Medicine Biobank
 
-## ETL
-### 👴 omop meds-etl 0.1.3
-#### path
-/meds-biobank/src/meds-biobank/etl_pipelines/omop_meds_nwsted.py
-#### description
-re-implementation of src/meds_etl/omop.py from the meds_etl package version 0.1.3 which outputs from OMOP v5.4/5.3 to MEDS v0.1.3 (nested format, use this with CLMBR-T-base/FEMR v0.2.3)
-#### workflow
+---
+
+## Table of Contents
+
+- [Features](#features)
+  - [ETL](#etl)
+    - [OMOP MEDS-ETL 0.1.3 (Nested)](#-omop-meds-etl-013)
+    - [OMOP MEDS-ETL 0.3.11 (Flat)](#-omop-meds-etl-0311)
+  - [Ontology Transforms](#ontology-transforms)
+
+---
+
+## Features
+
+### ETL
+
+#### OMOP MEDS-ETL 0.1.3
+
+| | |
+|---|---|
+| **Path** | `/meds-biobank/src/meds-biobank/etl_pipelines/omop_meds_nwsted.py` |
+| **Description** | Re-implementation of `src/meds_etl/omop.py` from `meds_etl` v0.1.3. Converts OMOP v5.4/5.3 → MEDS v0.1.3 (nested format). Use with CLMBR-T-base / FEMR v0.2.3. |
+
+**Workflow**
 1. Extract all events
-2. Prune/deduplicate patient event streams
+2. Prune / deduplicate patient event streams
 3. Convert event streams into nested patient representations
-#### differences from source
-Prune (delta_encode, remove_nones) before finalizing the meds mapping.
-#### Supported Tables
-- person
-- visit_occurrence
-- procedure_occurrence
-- condition_occurrence
-- drug_exposure
-- observation
-- measurements
-- death
-### options
-- Pre-ETL of measurements yielding value and unit conversion and separation into labs and vitals (sub-options: where possible vs. drop messy)
 
-### 👶 omop meds-etl 0.3.11
-#### path
-/meds-biobank/src/meds-biobank/etl_pipelines/omop_nested_flat.py
-#### description
-A re-implementation of src/meds_etl/omop.py from the meds_etl package version 0.3.11 which outputs from OMOP v5.4/5.3 to MEDS v0.3.3 (flat format, handles visit discharge).
-#### workflow
+**Differences from source**
+Pruning (`delta_encode`, `remove_nones`) happens *before* finalizing the MEDS mapping.
+
+**Supported Tables**
+`person` · `visit_occurrence` · `procedure_occurrence` · `condition_occurrence` · `drug_exposure` · `observation` · `measurements` · `death`
+
+**Options**
+- Pre-ETL of measurements: value/unit conversion + separation into labs and vitals
+  - Sub-options: *where possible* vs. *drop messy*
+
+---
+
+#### OMOP MEDS-ETL 0.3.11
+
+| | |
+|---|---|
+| **Path** | `/meds-biobank/src/meds-biobank/etl_pipelines/omop_nested_flat.py` |
+| **Description** | Re-implementation of `src/meds_etl/omop.py` from `meds_etl` v0.3.11. Converts OMOP v5.4/5.3 → MEDS v0.3.3 (flat format, handles visit discharge). |
+
+**Workflow**
 1. Extract all events
-2. Prune/deduplicate patient event streams
+2. Prune / deduplicate patient event streams
 3. Order event streams by patient, time
-#### differences from source
-Prune (delta_encode, remove_nones) within the etl rather than as part of the tokenizer (FEMR 0.2.3, transforms sub-module).
-#### Supported Tables
-- person
-- visit_occurrence
-- procedure_occurrence
-- condition_occurrence
-- drug_exposure
-- observation
-- measurements
-- death
-### options
-- Pre-ETL of measurements yielding value and unit conversion and separation into labs and vitals (sub-options: where possible vs. drop messy)
 
-## Ontology Transforms
-### Code Vocabulary
-- vocab_id/concept_code
-- original concept_id
+**Differences from source**
+Pruning (`delta_encode`, `remove_nones`) happens *within the ETL*, rather than as part of the tokenizer (FEMR 0.2.3 `transforms` sub-module).
+
+**Supported Tables**
+`person` · `visit_occurrence` · `procedure_occurrence` · `condition_occurrence` · `drug_exposure` · `observation` · `measurements` · `death`
+
+**Options**
+- Pre-ETL of measurements: value/unit conversion + separation into labs and vitals
+  - Sub-options: *where possible* vs. *drop messy*
+
+---
+
+### Ontology Transforms
+
+**Code Vocabulary**
+- `vocab_id` / `concept_code`
+- Original `concept_id`
 - Categorizations (CCS, Phecodes)
-### Measurement Representation
-- decile-binned with zero-handling
+
+**Measurement Representation**
+- Decile-binned with zero-handling
