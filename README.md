@@ -6,7 +6,7 @@ At this time the package is primarily developed for use with Penn Medicine Bioba
 # Features
 
 ## ETL
-### omop meds-etl 0.1.3
+### 👴 omop meds-etl 0.1.3
 #### path
 /meds-biobank/src/meds-biobank/etl_pipelines/omop_meds_nwsted.py
 #### description
@@ -29,7 +29,7 @@ Prune (delta_encode, remove_nones) before finalizing the meds mapping.
 ### options
 - Pre-ETL of measurements yielding value and unit conversion and separation into labs and vitals (sub-options: where possible vs. drop messy)
 
-### omop meds-etl 0.3.11
+### 👶 omop meds-etl 0.3.11
 #### path
 /meds-biobank/src/meds-biobank/etl_pipelines/omop_nested_flat.py
 #### description
