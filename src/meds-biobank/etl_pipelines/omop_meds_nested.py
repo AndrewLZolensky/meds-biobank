@@ -448,3 +448,25 @@ def nest_patients(meds_events):
     Nest and return ordered by patient and time
     """
     pass
+
+if __name__ == "__main__":
+
+    # read tables
+    visit_occurrence = spark.sql("SELECT * FROM visit_occurrence")
+    drug_exposure = spark.sql("SELECT * FROM drug_exposure")
+    concepts = spark.sql("SELECT * FROM concepts")
+
+    # pack for ETL
+    dfs = [visit_occurrence, drug_exposure]
+    tables = ["visit_occurrence", "drug_exposure"]
+
+    # perform ETL
+    event_dfs = [extract_events(dfs[i], tables[i]) for i in range(len(dfs))]
+    event_df = gather_event_dfs(event_dfs)
+    pruned_event_df = prune_events(event_df)
+    meds_events = post_process_events(pruned_event_df)
+
+    # visualize a patient
+    patient_id = ...
+    patient = nest_patient(meds_events, patient_id)
+    print(patient)
