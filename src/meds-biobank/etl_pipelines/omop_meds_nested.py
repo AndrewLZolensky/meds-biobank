@@ -427,7 +427,7 @@ def nest_patient(meds_events, patient_id):
                 F.col("code"),
                 F.col("metadata"),
                 F.col("text_value"),
-                F.col("string_value"),
+                F.col("numeric_value"),
             ).alias("measurement"),
         )
         .groupBy("time")
