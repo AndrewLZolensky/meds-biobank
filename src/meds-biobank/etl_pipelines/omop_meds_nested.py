@@ -159,7 +159,7 @@ def extract_events(df, table):
         )
     
     # drug_occurrence table
-    elif table == "drug_occurrence":
+    elif table == "drug_exposure":
 
         # get drug events
         events = (
@@ -289,7 +289,7 @@ def extract_events(df, table):
             .withColumn("META_visit_id", F.col("visit_occurrence_id"))
             .withColumn("META_unit", F.col("unit_source_value"))
             .withColumn("META_end", F.lit(None))
-            .select("patient_id", "start", "concept_id", "value", "META_end" "META_event_type", "META_visit_id", "META_unit")
+            .select("patient_id", "start", "concept_id", "value", "META_end", "META_event_type", "META_visit_id", "META_unit")
         )
 
     # undefined table
@@ -297,7 +297,7 @@ def extract_events(df, table):
         raise Exception(f"Table {table} not supported")
     
     # cast visit id to correct type
-    patients = patients.withColumn("META_visit_id", F.col("META_visit_id").cast("long"))
+    events = events.withColumn("META_visit_id", F.col("META_visit_id").cast("long"))
         
     return events
 
@@ -353,7 +353,7 @@ def prune_events(events):
         .drop("_last_start", "_last_value")
     )
 
-    return events
+    return pruned_events
 
 def post_process_events(events, concepts):
     """
@@ -383,7 +383,7 @@ def post_process_events(events, concepts):
     # handle value
     events = (
         events
-        .withColumn("text_value", F.expr("try_cast(value AS FLOAT)"))
+        .withColumn("numeric_value", F.expr("try_cast(value AS FLOAT)"))
         .withColumn("string_value", F.when(F.expr("try_cast(value AS FLOAT)").isNull(), F.col("value")).otherwise(F.lit(None)))
         .drop("value")
     )
@@ -437,7 +437,7 @@ def nest_patient(meds_events, patient_id):
 
     events = sorted(
         (
-            {"time": row["start"], "measurements": [m.asDict(recursive=True) for m in row["measurements"]]}
+            {"time": row["time"], "measurements": [m.asDict(recursive=True) for m in row["measurements"]]}
             for row in rows
         ),
         key=lambda e: e["time"],
@@ -457,7 +457,7 @@ if __name__ == "__main__":
     # read tables
     visit_occurrence = spark.sql("SELECT * FROM visit_occurrence")
     drug_exposure = spark.sql("SELECT * FROM drug_exposure")
-    concepts = spark.sql("SELECT * FROM concepts")
+    concept = spark.sql("SELECT * FROM concept")
 
     # pack for ETL
     dfs = [visit_occurrence, drug_exposure]
@@ -467,7 +467,7 @@ if __name__ == "__main__":
     event_dfs = [extract_events(dfs[i], tables[i]) for i in range(len(dfs))]
     event_df = gather_event_dfs(event_dfs)
     pruned_event_df = prune_events(event_df)
-    meds_events = post_process_events(pruned_event_df)
+    meds_events = post_process_events(pruned_event_df, concept)
 
     # visualize a patient
     patient_id = ...
