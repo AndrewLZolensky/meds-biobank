@@ -1,6 +1,8 @@
 # meds-biobank
 This is an UNOFFICIAL lightweight python re-implementation of several parts of the MEDS software ecosystem. It is designed to operate on in-memory tables loaded via pyspark, rather than directly on disk. It is intended for users of small to medium-scale biobanks, which are often queried via cloud services from Interactive Python Notebooks.
 
+At this time the package is primarily developed for use with Penn Medicine Biobank.
+
 # Features
 
 ## omop meds-etl 0.1.3
