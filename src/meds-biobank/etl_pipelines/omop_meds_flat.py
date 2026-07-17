@@ -5,6 +5,10 @@ from pyspark.sql import Window
 This is the OMOP-meds ETL from meds_etl 0.1.3
 """
 
+# TODO: add option to use value_converted and unit_converted from measurements table
+
+# TODO: add option to maintain original OMOP concept id rather than translating to code = vocabulary_id/source_code
+
 OMOP_BIRTH = 4083587
 OMOP_DEATH = 4306655
 
