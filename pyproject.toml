@@ -1,13 +1,26 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools >= 77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mypackage"
-version = "0.1.0"
-description = "your description"
-requires-python = ">=3.8"
-dependencies = []
+name = "meds-biobank"
+version = "0.0.1"
+authors = [
+  { name="Andrew Zolensky", email="andrewlzolensky@gmail.com" },
+]
+description = "Unofficial, lightweight Python re-implementation of parts of the **MEDS** software ecosystem, built to operate on in-memory tables loaded via PySpark rather than directly on disk. Designed for small-to-medium biobanks queried through cloud services in interactive Python notebooks."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["pyspark>=3.0"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "Apache-2.0"
+license-files = ["LICEN[CS]E*"]
+
+[project.urls]
+Homepage = "https://github.com/AndrewLZolensky/meds-biobank"
 
 [tool.setuptools.packages.find]
 where = ["src"]
