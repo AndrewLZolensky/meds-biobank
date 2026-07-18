@@ -409,7 +409,7 @@ def post_process_events(events, concepts):
                 F.col("META_end").alias("end")
             )
         )
-        .select("patient_id", "time", "code", "string_value", "numeric_value", "metadata")
+        .select("patient_id", "time", "code", "text_value", "numeric_value", "metadata")
     )
         
     return events
