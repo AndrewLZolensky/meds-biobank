@@ -446,11 +446,48 @@ def nest_patient(meds_events, patient_id):
     return {"patient_id": patient_id, "static_measurements": [], "events": events}
 
 
-def nest_patients(meds_events):
+def meds_flat_to_patients_df(meds_df):
     """
-    Nest and return ordered by patient and time
+    ARGS
+        - meds_df: a meds-flat 0.1.3 compliant DF
+    RETURNS
+        - patients_df: Spark DF with cols patient_id, static_measurements, events
+                       (events is array<struct<time, measurements>>, sorted by time)
     """
-    pass
+    measurement_col = F.struct(
+        F.col("code"),
+        F.col("metadata"),
+        F.col("text_value"),
+        F.col("numeric_value"),
+    ).alias("measurement")
+
+    # Level 1: one row per (patient_id, start) -> array of measurement structs
+    per_time = (
+        meds_df
+        .select("patient_id", "time", measurement_col)
+        .groupBy("patient_id", "time")
+        .agg(F.collect_list("measurement").alias("measurements"))
+    )
+
+    # Level 2: one row per patient_id -> array of {time, measurements} structs
+    patients_df = (
+        per_time
+        .groupBy("patient_id")
+        .agg(
+            F.expr("""
+                array_sort(
+                    collect_list(struct(time, measurements)),
+                    (a, b) -> case when a.time < b.time then -1
+                                   when a.time > b.time then 1
+                                   else 0 end
+                )
+            """).alias("events")
+        )
+        .withColumn("static_measurements", F.array().cast("array<string>"))
+        .select("patient_id", "static_measurements", "events")
+    )
+
+    return patients_df
 
 if __name__ == "__main__":
 
