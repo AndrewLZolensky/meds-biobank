@@ -31,11 +31,11 @@ def extract_events(df, table, concepts):
         events (pyspark.sql.DataFrame):
             Desc: a MEDS table in flat format w/ metadata expanded, containing all events
             Schema:
-                |patient_id|time|code|concept_id|value|META_end|META_event_type|META_visit_id|META_unit|
+                |patient_id|time|code|omop_concept_id|value|META_end|META_event_type|META_visit_id|META_unit|
                 - patient_id: bigint
                 - time: timestamp
                 - code: string
-                - concept_id: bigint
+                - omop_concept_id: bigint
                 - string_value: string
                 - numeric_value: float
                 - META_end: timestamp
@@ -57,14 +57,16 @@ def extract_events(df, table, concepts):
         birth_events = (
             events
             .withColumn("concept_id", F.lit(OMOP_BIRTH))
+            .withColumn("omop_concept_id", F.lit(OMOP_BIRTH))
             .withColumn("META_event_type", F.lit("birth"))
-            .select("patient_id", "time", "concept_id", "META_event_type")
+            .select("patient_id", "time", "omop_concept_id", "concept_id", "META_event_type")
         )
 
         # get demographic events: gender
         gender_events = (
             events
             .filter(F.col("gender_concept_id") != 0)
+            .withColumn("omop_concept_id", F.col("gender_concept_id"))
             .withColumn(
                 "concept_id",
                 (
@@ -73,13 +75,14 @@ def extract_events(df, table, concepts):
                 )
             )
             .withColumn("META_event_type", F.lit("gender"))
-            .select("patient_id", "time", "concept_id", "META_event_type")
+            .select("patient_id", "time", "omop_concept_id", "concept_id", "META_event_type")
         )
 
         # get demographic events: race
         race_events = (
             events
             .filter(F.col("race_concept_id") != 0)
+            .withColumn("omop_concept_id", F.col("race_concept_id"))
             .withColumn(
                 "concept_id",
                 (
@@ -88,13 +91,14 @@ def extract_events(df, table, concepts):
                 )
             )
             .withColumn("META_event_type", F.lit("race"))
-            .select("patient_id", "time", "concept_id", "META_event_type")
+            .select("patient_id", "time", "omop_concept_id", "concept_id", "META_event_type")
         )
 
         # get demographic events: ethnicity
         ethnicity_events = (
             events
             .filter(F.col("ethnicity_concept_id") != 0)
+            .withColumn("omop_concept_id", F.col("ethnicity_concept_id"))
             .withColumn(
                 "concept_id",
                 (
@@ -103,7 +107,7 @@ def extract_events(df, table, concepts):
                 )
             )
             .withColumn("META_event_type", F.lit("ethnicity"))
-            .select("patient_id", "time", "concept_id", "META_event_type")
+            .select("patient_id", "time", "omop_concept_id", "concept_id", "META_event_type")
         )
 
         # form events
@@ -116,9 +120,10 @@ def extract_events(df, table, concepts):
         events = (
             events
             .withColumn("concept_id", F.lit(OMOP_DEATH))
+            .withColumn("omop_concept_id", F.lit(OMOP_DEATH))
             .withColumn("time", F.to_timestamp(F.col("death_date")))
             .withColumn("META_event_type", F.lit("death"))
-            .select("patient_id", "time", "concept_id", "META_event_type")
+            .select("patient_id", "time", "omop_concept_id", "concept_id", "META_event_type")
         )
 
     # visit_occurrence source table
@@ -128,6 +133,7 @@ def extract_events(df, table, concepts):
         admission_events = (
             events
             .withColumn("time", F.to_timestamp(F.col("visit_start_datetime")))
+            .withColumn("omop_concept_id", F.col("visit_concept_id"))
             .withColumn(
                 "concept_id",
                 (
@@ -139,26 +145,27 @@ def extract_events(df, table, concepts):
             .withColumn("META_event_type", F.lit("visit_admission"))
             .withColumn("META_visit_id", F.col("visit_occurrence_id"))
             .withColumn("META_end", F.coalesce(F.col("visit_end_datetime"), F.to_timestamp(F.col("visit_end_date"))))
-            .select("patient_id", "time", "concept_id", "META_end", "META_event_type", "META_visit_id")
+            .select("patient_id", "time", "omop_concept_id", "concept_id", "META_end", "META_event_type", "META_visit_id")
         )
 
         # get visit discharge events
         discharge_events = (
             events
             .filter(F.col("discharge_to_concept_id").isNotNull())
+            .withColumn("omop_concept_id", F.col("discharge_to_concept_id"))
             .withColumnRenamed("discharge_to_concept_id", "concept_id")
             .withColumn("time", F.coalesce(F.col("visit_end_datetime"), F.to_timestamp(F.col("visit_end_date"))))
             .filter(F.col("time").isNotNull())
             .withColumn("META_event_type", F.lit("visit_discharge"))
             .withColumn("META_visit_id", F.col("visit_occurrence_id"))
             .withColumn("META_end", F.coalesce(F.col("visit_end_datetime"), F.to_timestamp(F.col("visit_end_date"))))
-            .select("patient_id", "time", "concept_id", "META_end", "META_event_type", "META_visit_id")
+            .select("patient_id", "time", "omop_concept_id", "concept_id", "META_end", "META_event_type", "META_visit_id")
         )
 
         # union
         events = admission_events.unionByName(discharge_events, allowMissingColumns=False)
     
-    # TODO: handle visit occurrence supplement
+    # handle visit occurrence supplement
     elif table == "visit_occurrence_supplement":
         flags = list(CUSTOM_CONCEPTS.keys())
         stack_args = ", ".join(f"'{c}', {c}" for c in flags)
@@ -167,12 +174,13 @@ def extract_events(df, table, concepts):
             events
             .withColumn("time", F.to_timestamp(F.col("visit_start_datetime")))
             .selectExpr("*", f"stack({len(flags)}, {stack_args}) as (code, value)")
-            .withColumn("concept_id", mapping_expr[F.col("code")])
+            .withColumn("omop_concept_id", mapping_expr[F.col("code")])
+            .withColumn("code", F.concat(F.lit("Custom/"), F.col("code")))
             .drop(*flags)
             .filter(F.col("value") == 1)
             .withColumn("META_event_type", F.lit("visit_flag"))
             .withColumn("META_visit_id", F.col("visit_occurrence_id"))
-            .select("patient_id", "time", "code", "concept_id", "META_event_type", "META_visit_id")
+            .select("patient_id", "time", "omop_concept_id", "code", "META_event_type", "META_visit_id")
         )
     
     # drug_occurrence table
@@ -182,6 +190,7 @@ def extract_events(df, table, concepts):
         events = (
             events
             .withColumn("time", F.coalesce(F.col("drug_exposure_start_datetime"), F.to_timestamp(F.col("drug_exposure_start_date"))))
+            .withColumn("omop_concept_id", F.col("drug_concept_id"))
             .withColumn(
                 "concept_id",
                 (
@@ -193,7 +202,7 @@ def extract_events(df, table, concepts):
             .withColumn("META_event_type", F.lit("drug"))
             .withColumn("META_visit_id", F.col("visit_occurrence_id"))
             .withColumn("META_end", F.coalesce(F.col("drug_exposure_end_datetime"), F.to_timestamp(F.col("drug_exposure_end_date"))))
-            .select("patient_id", "time", "concept_id", "META_end", "META_event_type", "META_visit_id")
+            .select("patient_id", "time", "omop_concept_id", "concept_id", "META_end", "META_event_type", "META_visit_id")
         )
     
     # condition table
@@ -203,6 +212,7 @@ def extract_events(df, table, concepts):
         events = (
             events
             .withColumn("time", F.coalesce(F.col("condition_start_datetime"), F.to_timestamp(F.col("condition_start_date"))))
+            .withColumn("omop_concept_id", F.col("condition_concept_id"))
             .withColumn(
                 "concept_id",
                 (
@@ -214,7 +224,7 @@ def extract_events(df, table, concepts):
             .withColumn("META_event_type", F.lit("condition"))
             .withColumn("META_visit_id", F.col("visit_occurrence_id"))
             .withColumn("META_end", F.coalesce(F.col("condition_end_datetime"), F.to_timestamp(F.col("condition_end_date"))))
-            .select("patient_id", "time", "concept_id", "META_end", "META_event_type", "META_visit_id")
+            .select("patient_id", "time", "omop_concept_id", "concept_id", "META_end", "META_event_type", "META_visit_id")
         )
     
     # procedure table
@@ -224,6 +234,7 @@ def extract_events(df, table, concepts):
         events = (
             events
             .withColumn("time", F.coalesce(F.col("procedure_datetime"), F.to_timestamp(F.col("procedure_date"))))
+            .withColumn("omop_concept_id", F.col("procedure_concept_id"))
             .withColumn(
                 "concept_id",
                 (
@@ -234,7 +245,7 @@ def extract_events(df, table, concepts):
             .filter(F.col("concept_id") != 0)
             .withColumn("META_event_type", F.lit("procedure"))
             .withColumn("META_visit_id", F.col("visit_occurrence_id"))
-            .select("patient_id", "time", "concept_id", "META_event_type", "META_visit_id")
+            .select("patient_id", "time", "omop_concept_id", "concept_id", "META_event_type", "META_visit_id")
         )
     
     # observation table
@@ -243,6 +254,7 @@ def extract_events(df, table, concepts):
         # get observation events
         events = (
             events.withColumn("time", F.coalesce(F.col("observation_datetime"), F.to_timestamp(F.col("observation_date"))))
+            .withColumn("omop_concept_id", F.col("observation_concept_id"))
             .withColumn(
                 "concept_id",
                 (
@@ -266,7 +278,7 @@ def extract_events(df, table, concepts):
             .withColumn("META_event_type", F.lit("observation"))
             .withColumn("META_visit_id", F.col("visit_occurrence_id"))
             .withColumn("META_unit", F.col("unit_source_value"))
-            .select("patient_id", "time", "concept_id", "value", "META_event_type", "META_visit_id", "META_unit")
+            .select("patient_id", "time", "omop_concept_id", "concept_id", "value", "META_event_type", "META_visit_id", "META_unit")
         )
 
     elif table == "measurement":
@@ -277,6 +289,7 @@ def extract_events(df, table, concepts):
         # get measurement events
         events = (
             events.withColumn("time", F.coalesce(F.col("measurement_datetime"), F.to_timestamp(F.col("measurement_date"))))
+            .withColumn("omop_concept_id", F.col("measurement_concept_id"))
             .withColumn(
                 "concept_id",
                 (
@@ -301,7 +314,7 @@ def extract_events(df, table, concepts):
             .withColumn("META_visit_id", F.col("visit_occurrence_id"))
             .withColumn("META_unit", F.col("unit_source_value"))
             .withColumn("META_measurement_id", F.col("measurement_id"))
-            .select("patient_id", "time", "concept_id", "value", "META_event_type", "META_visit_id", "META_unit", "META_measurement_id")
+            .select("patient_id", "time", "omop_concept_id", "concept_id", "value", "META_event_type", "META_visit_id", "META_unit", "META_measurement_id")
         )
     
     # process labs and vitals
@@ -312,6 +325,7 @@ def extract_events(df, table, concepts):
         events = (
             events
             .withColumn("time", F.coalesce(F.col("measurement_datetime"), F.to_timestamp(F.col("measurement_date"))))
+            .withColumn("omop_concept_id", F.col("measurement_concept_id"))
             .withColumn(
                 "concept_id",
                 (
@@ -325,7 +339,7 @@ def extract_events(df, table, concepts):
             .withColumn("META_visit_id", F.col("visit_occurrence_id"))
             .withColumn("META_unit", F.col("unit_converted"))
             .withColumn("META_measurement_id", F.col("measurement_id"))
-            .select("patient_id", "time", "concept_id", "value", "META_event_type", "META_visit_id", "META_unit", "META_measurement_id")
+            .select("patient_id", "time", "omop_concept_id", "concept_id", "value", "META_event_type", "META_visit_id", "META_unit", "META_measurement_id")
         )
 
     # undefined table
@@ -338,7 +352,7 @@ def extract_events(df, table, concepts):
         if col not in events.columns:
             events = events.withColumn(col, F.lit(None))
     
-    # cast concept id if it is present
+    # convert concept_id to code if it is present (do not alter omop_concept_id)
     concept_to_code = ( # compute concept to code for all src tables
         concepts
         .withColumn("code", F.concat(F.col("vocabulary_id"), F.lit("/"), F.col("concept_code")))
@@ -349,7 +363,7 @@ def extract_events(df, table, concepts):
             concept_to_code,
             events.concept_id == concept_to_code.concept_id,
             "inner"
-        ).drop(concept_to_code.concept_id)
+        ).drop(events.concept_id, concept_to_code.concept_id)
 
     # cast visit id to correct type
     events = events.withColumn("META_visit_id", F.col("META_visit_id").cast("long"))
@@ -387,14 +401,14 @@ def prune_events(events):
     Args:
         events (pyspark.sql.DataFrame):
             Desc: 
-            Schema: |patient_id|time|code|concept_id|value|META_end|META_event_type|META_visit_id|META_unit|
+            Schema: |patient_id|time|omop_concept_id|code|value|META_end|META_event_type|META_visit_id|META_unit|
     Returns:
         pruned_events (pyspark.sql.DataFrame):
             Desc: 
-            Schema: |patient_id|time|code|concept_id|value|META_end|META_event_type|META_visit_id|META_unit|
+            Schema: |patient_id|time|omop_concept_id|code|value|META_end|META_event_type|META_visit_id|META_unit|
     """
     # remove nones
-    w = Window.partitionBy("patient_id", "concept_id", F.to_date("time"))
+    w = Window.partitionBy("patient_id", "code", F.to_date("time"))
     pruned_events = (
         events
         .withColumn(
@@ -410,7 +424,7 @@ def prune_events(events):
     )
     
     # delta encode
-    w = Window.partitionBy("patient_id", "concept_id").orderBy("time")
+    w = Window.partitionBy("patient_id", "code").orderBy("time")
     pruned_events = (
         pruned_events
         .withColumn("_last_time", F.lag("time").over(w))
@@ -427,7 +441,7 @@ def prune_events(events):
 
 def post_process(events):
     # post-process value into numeric and string value
-    # Schema: |patient_id|time|code|concept_id|numeric_value|text_value|META_end|META_event_type|META_visit_id|META_unit|
+    # Schema: |patient_id|time|omop_concept_id|code|value|META_end|META_event_type|META_visit_id|META_unit|
     events = (
         events
         .withColumn("numeric_value", F.expr("try_cast(value AS FLOAT)"))
@@ -437,7 +451,7 @@ def post_process(events):
     return events
 
 def format_events(events):
-    # Schema: |patient_id|time|code|concept_id|numeric_value|text_value|META_end|META_event_type|META_visit_id|META_unit|
+    # Schema: |patient_id|time|omop_concept_id|code|value|META_end|META_event_type|META_visit_id|META_unit|
     return events.orderBy("patient_id", "time")
 
 # TODO: bundle meta-data, times, and patients
