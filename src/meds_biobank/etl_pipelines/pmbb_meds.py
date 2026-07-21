@@ -363,7 +363,6 @@ def gather_event_dfs(event_dfs, measurement):
     event_dfs EXCLUDES measurements
     if labs or vitals are present, only add rows from measurement that are not already in them, as their values are higher-quality
     """
-    # TODO: smart union
 
     # handle case with only meas events
     if len(event_dfs) == 0:
@@ -426,5 +425,25 @@ def prune_events(events):
 
     return pruned_events
 
-# TODO: post-process value into numeric and string value
+def post_process(events):
+    # post-process value into numeric and string value
+    # Schema: |patient_id|time|code|concept_id|numeric_value|text_value|META_end|META_event_type|META_visit_id|META_unit|
+    events = (
+        events
+        .withColumn("numeric_value", F.expr("try_cast(value AS FLOAT)"))
+        .withColumn("text_value", F.when(F.expr("try_cast(value AS FLOAT)").isNull(), F.col("value")).otherwise(F.lit(None)))
+        .drop("value")
+    )
+    return events
+
+def format_events(events):
+    # Schema: |patient_id|time|code|concept_id|numeric_value|text_value|META_end|META_event_type|META_visit_id|META_unit|
+    return events.orderBy("patient_id", "time")
+
 # TODO: bundle meta-data, times, and patients
+
+# TODO: option to attach classifications to concepts (phecodes, CCS, medication classes, ingredients)
+
+# TODO: option to bin measurements into deciles (w/ separate 0 case)
+
+# TODO: option to rollup infrequent concepts into frequent ancestors, and optionally drop non-mapped
