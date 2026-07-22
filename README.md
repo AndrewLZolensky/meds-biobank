@@ -68,12 +68,32 @@ Pruning (`delta_encode`, `remove_nones`) happens *within the ETL*, rather than a
 
 ---
 
-### Ontology Transforms
+#### PMBB OMOP MEDS-ETL
 
-**Code Vocabulary**
-- `vocab_id` / `concept_code`
-- Original `concept_id`
-- Categorizations (CCS, Phecodes)
+**Specification**
+Outputs in the format:
+```bash
+|patient_id|code|time|end|numeric_value|text_value|unit|event_type|visit_id|
+```
+Special Notes:
+1. code is an OMOP concept id. Unless explicitly specified via boolean flag, it is the standardized OMOP concept id.
+2. time is the time of event, end is optional
+3. numeric_value and unit contain ETL'd values for a large subset of measurements pre-extracted into labs_ and vitals_ tables with value_converted and unit_converted columns
+4. event_type contains the source OMOP domain for the table (e.g. measurement, procedure, etc.) EXCEPT for labs and vitals which are formatted as "labs_"/"vitals_" + name e.g. "labs_albumin"
 
-**Measurement Representation**
-- Decile-binned with zero-handling
+Flags:
+1. If the OMOP extract only yields measurements, there is (will be) separate ETL logic in /transforms to transform the data into the right form.
+
+---
+
+### Tokenizers
+
+---
+
+### Transforms
+
+**etl_labs_vitals**
+Expects events table in the format |patient_id|code|time|end|numeric_value|text_value|unit|event_type|visit_id|. Performs labs/vitals ETL.
+
+**etl_labs_vitals**
+Expects events table in the format |patient_id|code|time|end|numeric_value|text_value|unit|event_type|visit_id|. Post labs/vitals ETL. Extracts mapping from omop concept ids to labs_/vitals_ names
