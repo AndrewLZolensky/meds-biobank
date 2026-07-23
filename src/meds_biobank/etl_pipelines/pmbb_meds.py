@@ -33,7 +33,7 @@ def extract_events(df, table, use_omop_cid=True):
     """
 
     # all source tables, hash patient id
-    events = df.withColumn("patient_id", F.crc32(F.col("person_id"))) # hash to patient id
+    events = df.withColumn("patient_id", F.crc32(F.col("person_id").cast("string"))) # hash to patient id
 
     # person source table
     if table == "person":
